@@ -57,6 +57,18 @@ class TestGetPluginsListFromDict:
         result = get_plugins_list_from_dict(keys, data)
         assert result == [{"name": "plugin1"}]
 
+    def test_returns_empty_list_when_key_not_found_non_strict(self) -> "None":
+        data = {"level1": {"other": "value"}}
+        keys = ["level1", "missing_key"]
+        result = get_plugins_list_from_dict(keys, data, strict=False)
+        assert result == []
+
+    def test_returns_empty_list_when_intermediate_not_dict_non_strict(self) -> "None":
+        data = {"level1": "not_a_dict"}
+        keys = ["level1", "nested"]
+        result = get_plugins_list_from_dict(keys, data, strict=False)
+        assert result == []
+
 
 class TestRHDHPluginNeedsUpdate:
     """

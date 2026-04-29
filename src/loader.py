@@ -4,6 +4,7 @@ import yaml
 from packaging.version import Version
 
 from src.constants import (
+    DYNAMIC_PLUGINS_CONFIG_YAML_EXTRA_LOCATIONS,
     DYNAMIC_PLUGINS_CONFIG_YAML_FILE_PATH,
     DYNAMIC_PLUGINS_CONFIG_YAML_LOCATION,
     logger,
@@ -22,18 +23,27 @@ class RHDHPluginsConfigLoader:
         self,
         config_path=DYNAMIC_PLUGINS_CONFIG_YAML_FILE_PATH,
         config_location=DYNAMIC_PLUGINS_CONFIG_YAML_LOCATION,
+        extra_config_locations=None,
     ) -> "None":
         self.config_path = config_path
         self.config_location = config_location
+        self.extra_config_locations = (
+            extra_config_locations
+            if extra_config_locations is not None
+            else DYNAMIC_PLUGINS_CONFIG_YAML_EXTRA_LOCATIONS
+        )
 
     def _fetch_plugins_by_location(
-        self, data: "dict[str, str | int | bool]"
+        self,
+        data: "dict[str, str | int | bool]",
+        location: "str | None" = None,
+        strict: "bool" = True,
     ) -> "list[dict[str, str | int | bool]]":
         """
         fetches the plugins from the config file based on the config location
         """
-        keys = self.config_location.split(".")
-        plugins_list = get_plugins_list_from_dict(keys, data)
+        keys = (location if location is not None else self.config_location).split(".")
+        plugins_list = get_plugins_list_from_dict(keys, data, strict=strict)
 
         return plugins_list if isinstance(plugins_list, list) else []
 
@@ -157,7 +167,11 @@ class RHDHPluginsConfigLoader:
         with open(self.config_path, "r") as f:
             data = yaml.safe_load(f)
 
-        plugins_list = self._fetch_plugins_by_location(data)
-        rhdh_plugins = self._convert_rhdhplugin_list(plugins_list)
+        all_plugins_list = self._fetch_plugins_by_location(data, strict=False)
+        for extra_location in self.extra_config_locations:
+            all_plugins_list.extend(
+                self._fetch_plugins_by_location(data, extra_location, strict=False)
+            )
 
+        rhdh_plugins = self._convert_rhdhplugin_list(all_plugins_list)
         return rhdh_plugins

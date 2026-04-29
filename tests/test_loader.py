@@ -359,6 +359,119 @@ class TestRHDHPluginsConfigLoader:
         assert result[1].current_version == Version("2.0.0")
         assert result[1].current_second_version is None
 
+    def test_init_with_default_extra_locations(self) -> "None":
+        loader = RHDHPluginsConfigLoader()
+        assert loader.extra_config_locations == ["global.lightspeed.plugins"]
+
+    def test_init_with_custom_extra_locations(self) -> "None":
+        loader = RHDHPluginsConfigLoader(
+            extra_config_locations=["custom.extra.plugins"]
+        )
+        assert loader.extra_config_locations == ["custom.extra.plugins"]
+
+    def test_init_with_empty_extra_locations(self) -> "None":
+        loader = RHDHPluginsConfigLoader(extra_config_locations=[])
+        assert loader.extra_config_locations == []
+
+    def test_fetch_plugins_by_location_with_explicit_location(
+        self, sample_config_data_with_lightspeed_plugins: "dict[str, Any]"
+    ) -> "None":
+        loader = RHDHPluginsConfigLoader()
+        plugins = loader._fetch_plugins_by_location(
+            sample_config_data_with_lightspeed_plugins, "global.lightspeed.plugins"
+        )
+        assert isinstance(plugins, list)
+        assert len(plugins) == 1
+
+    def test_fetch_plugins_by_location_missing_extra_location(
+        self, sample_config_data: "dict[str, Any]"
+    ) -> "None":
+        loader = RHDHPluginsConfigLoader()
+        plugins = loader._fetch_plugins_by_location(
+            sample_config_data, "global.lightspeed.plugins", strict=False
+        )
+        assert plugins == []
+
+    def test_load_rhdh_plugins_from_both_locations(
+        self, temp_yaml_file_with_lightspeed_plugins: "str"
+    ) -> "None":
+        loader = RHDHPluginsConfigLoader(
+            config_path=temp_yaml_file_with_lightspeed_plugins
+        )
+        plugins = loader.load_rhdh_plugins()
+        assert len(plugins) == 2
+        plugin_names = [p.plugin_name for p in plugins]
+        assert "backstage-plugin-mcp-actions-backend" in plugin_names
+        assert "lightspeed-plugin" in plugin_names
+
+    def test_load_rhdh_plugins_from_lightspeed_only(
+        self, temp_yaml_file_lightspeed_only: "str"
+    ) -> "None":
+        loader = RHDHPluginsConfigLoader(config_path=temp_yaml_file_lightspeed_only)
+        plugins = loader.load_rhdh_plugins()
+        assert len(plugins) == 1
+        assert plugins[0].plugin_name == "lightspeed-plugin"
+
+    def test_load_rhdh_plugins_no_extra_locations(
+        self, temp_yaml_file_with_lightspeed_plugins: "str"
+    ) -> "None":
+        loader = RHDHPluginsConfigLoader(
+            config_path=temp_yaml_file_with_lightspeed_plugins,
+            extra_config_locations=[],
+        )
+        plugins = loader.load_rhdh_plugins()
+        assert len(plugins) == 1
+        assert plugins[0].plugin_name == "backstage-plugin-mcp-actions-backend"
+
+    def test_load_rhdh_plugins_lightspeed_disabled_filtered(self) -> "None":
+        content = """global:
+  dynamic:
+    plugins: []
+  lightspeed:
+    plugins:
+      - disabled: true
+        package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/lightspeed-plugin:next__1.0.0!lightspeed-plugin
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write(content)
+            temp_path = f.name
+
+        try:
+            loader = RHDHPluginsConfigLoader(config_path=temp_path)
+            plugins = loader.load_rhdh_plugins()
+            assert plugins == []
+        finally:
+            Path(temp_path).unlink()
+
+    def test_load_rhdh_plugins_lightspeed_non_rhdh_filtered(self) -> "None":
+        content = """global:
+  dynamic:
+    plugins: []
+  lightspeed:
+    plugins:
+      - disabled: false
+        package: ./local-plugin/dist
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write(content)
+            temp_path = f.name
+
+        try:
+            loader = RHDHPluginsConfigLoader(config_path=temp_path)
+            plugins = loader.load_rhdh_plugins()
+            assert plugins == []
+        finally:
+            Path(temp_path).unlink()
+
+    def test_load_rhdh_plugins_missing_lightspeed_location_does_not_exit(
+        self, temp_yaml_file: "str"
+    ) -> "None":
+        # primary location exists but global.lightspeed.plugins
+        # is absent - should not exit
+        loader = RHDHPluginsConfigLoader(config_path=temp_yaml_file)
+        plugins = loader.load_rhdh_plugins()
+        assert len(plugins) == 2
+
     def test_parse_package_string_dual_version_with_different_prefix(self) -> "None":
         from unittest.mock import patch
 

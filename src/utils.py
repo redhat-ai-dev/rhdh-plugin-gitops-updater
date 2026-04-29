@@ -8,7 +8,7 @@ from src.types import RHDHPluginUpdaterConfig
 
 
 def get_plugins_list_from_dict(
-    keys: "list[str]", data: "dict[str, Any]"
+    keys: "list[str]", data: "dict[str, Any]", strict: "bool" = True
 ) -> "list[dict[str, Any]]":
     """
     navigates through a nested dictionary using a list of keys.
@@ -16,8 +16,10 @@ def get_plugins_list_from_dict(
     current: "dict[str, Any]" = data
     for key in keys:
         if not isinstance(current, dict) or key not in current:
-            logger.error("invalid config location, cannot find plugins list")
-            sys.exit(1)
+            if strict:
+                logger.error("invalid config location, cannot find plugins list")
+                sys.exit(1)
+            return []
 
         current = current[key]
 

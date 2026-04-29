@@ -13,6 +13,15 @@ DYNAMIC_PLUGINS_CONFIG_YAML_LOCATION = os.getenv(
     "DYNAMIC_PLUGINS_CONFIG_YAML_LOCATION", "global.dynamic.plugins"
 )
 
+# DYNAMIC_PLUGINS_CONFIG_YAML_EXTRA_LOCATIONS: list of
+# additional locations to check for plugins in the yaml file.
+_extra_locations_str = os.getenv(
+    "DYNAMIC_PLUGINS_CONFIG_YAML_EXTRA_LOCATIONS", "global.lightspeed.plugins"
+)
+DYNAMIC_PLUGINS_CONFIG_YAML_EXTRA_LOCATIONS = [
+    loc.strip() for loc in _extra_locations_str.split(",") if loc.strip()
+]
+
 # GITHUB_TOKEN: is the GitHub token to use for authentication
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 

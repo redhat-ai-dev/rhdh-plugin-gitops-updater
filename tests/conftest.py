@@ -308,6 +308,79 @@ def sample_yaml_content_with_dual_versions() -> "str":
 
 
 @pytest.fixture
+def sample_config_data_with_lightspeed_plugins() -> "dict[str, Any]":
+    """
+    creates a config with plugins in both global.dynamic.plugins
+    and global.lightspeed.plugins.
+    """
+    return {
+        "global": {
+            "dynamic": {
+                "plugins": [
+                    {
+                        "disabled": False,
+                        "package": "oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/backstage-plugin-mcp-actions-backend:next__0.1.2!backstage-plugin-mcp-actions-backend",
+                    },
+                ]
+            },
+            "lightspeed": {
+                "plugins": [
+                    {
+                        "disabled": False,
+                        "package": "oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/lightspeed-plugin:next__1.0.0!lightspeed-plugin",
+                    },
+                ]
+            },
+        }
+    }
+
+
+@pytest.fixture
+def temp_yaml_file_with_lightspeed_plugins() -> "Any":
+    """
+    creates a temporary YAML file with plugins in both global.dynamic.plugins
+    and global.lightspeed.plugins.
+    """
+    content = """global:
+  dynamic:
+    plugins:
+      - disabled: false
+        package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/backstage-plugin-mcp-actions-backend:next__0.1.2!backstage-plugin-mcp-actions-backend
+  lightspeed:
+    plugins:
+      - disabled: false
+        package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/lightspeed-plugin:next__1.0.0!lightspeed-plugin
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        f.write(content)
+        temp_path = f.name
+
+    yield temp_path
+
+    Path(temp_path).unlink()
+
+
+@pytest.fixture
+def temp_yaml_file_lightspeed_only() -> "Any":
+    """
+    creates a temporary YAML file with plugins only in global.lightspeed.plugins.
+    """
+    content = """global:
+  lightspeed:
+    plugins:
+      - disabled: false
+        package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/lightspeed-plugin:next__1.0.0!lightspeed-plugin
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        f.write(content)
+        temp_path = f.name
+
+    yield temp_path
+
+    Path(temp_path).unlink()
+
+
+@pytest.fixture
 def temp_yaml_file_with_dual_versions() -> "Any":
     """
     creates a temporary YAML file with dual version plugins for testing.
