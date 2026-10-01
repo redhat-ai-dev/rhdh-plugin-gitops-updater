@@ -10,17 +10,25 @@ DYNAMIC_PLUGINS_CONFIG_YAML_FILE_PATH = os.getenv(
 # DYNAMIC_PLUGINS_CONFIG_YAML_LOCATION: is the location of the dynamic
 # plugins config inside the yaml file.
 DYNAMIC_PLUGINS_CONFIG_YAML_LOCATION = os.getenv(
-    "DYNAMIC_PLUGINS_CONFIG_YAML_LOCATION", "global.dynamic.plugins"
+    "DYNAMIC_PLUGINS_CONFIG_YAML_LOCATION",
+    "redhat-developer-hub.dynamicPlugins.plugins",
 )
 
 # DYNAMIC_PLUGINS_CONFIG_YAML_EXTRA_LOCATIONS: list of
 # additional locations to check for plugins in the yaml file.
 _extra_locations_str = os.getenv(
-    "DYNAMIC_PLUGINS_CONFIG_YAML_EXTRA_LOCATIONS", "global.lightspeed.plugins"
+    "DYNAMIC_PLUGINS_CONFIG_YAML_EXTRA_LOCATIONS",
+    "redhat-developer-hub.intelligentAssistant.plugins",
 )
 DYNAMIC_PLUGINS_CONFIG_YAML_EXTRA_LOCATIONS = [
     loc.strip() for loc in _extra_locations_str.split(",") if loc.strip()
 ]
+
+# Use the legacy location only when the corresponding chart values list is absent.
+DYNAMIC_PLUGINS_CONFIG_YAML_FALLBACK_LOCATIONS = {
+    "redhat-developer-hub.dynamicPlugins.plugins": "global.dynamic.plugins",
+    "redhat-developer-hub.intelligentAssistant.plugins": "global.lightspeed.plugins",
+}
 
 # GITHUB_TOKEN: is the GitHub token to use for authentication
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")

@@ -5,6 +5,7 @@ from packaging.version import Version
 
 from src.constants import (
     DYNAMIC_PLUGINS_CONFIG_YAML_EXTRA_LOCATIONS,
+    DYNAMIC_PLUGINS_CONFIG_YAML_FALLBACK_LOCATIONS,
     DYNAMIC_PLUGINS_CONFIG_YAML_FILE_PATH,
     DYNAMIC_PLUGINS_CONFIG_YAML_LOCATION,
     logger,
@@ -46,6 +47,19 @@ class RHDHPluginsConfigLoader:
         plugins_list = get_plugins_list_from_dict(keys, data, strict=strict)
 
         return plugins_list if isinstance(plugins_list, list) else []
+
+    def _resolve_plugins_location(
+        self, data: "dict[str, str | int | bool]", location: "str"
+    ) -> "str":
+        current = data
+        for key in location.split("."):
+            if not isinstance(current, dict) or key not in current:
+                return DYNAMIC_PLUGINS_CONFIG_YAML_FALLBACK_LOCATIONS.get(
+                    location, location
+                )
+            current = current[key]
+
+        return location
 
     def _parse_package_string(
         self, package: "str"
@@ -167,11 +181,11 @@ class RHDHPluginsConfigLoader:
         with open(self.config_path, "r") as f:
             data = yaml.safe_load(f)
 
-        all_plugins_list = self._fetch_plugins_by_location(data, strict=False)
-        for extra_location in self.extra_config_locations:
+        all_plugins_list = []
+        for location in [self.config_location, *self.extra_config_locations]:
+            resolved_location = self._resolve_plugins_location(data, location)
             all_plugins_list.extend(
-                self._fetch_plugins_by_location(data, extra_location, strict=False)
+                self._fetch_plugins_by_location(data, resolved_location, strict=False)
             )
 
-        rhdh_plugins = self._convert_rhdhplugin_list(all_plugins_list)
-        return rhdh_plugins
+        return self._convert_rhdhplugin_list(all_plugins_list)

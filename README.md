@@ -135,7 +135,7 @@ Specify custom tag prefixes to filter plugin versions:
 | Input                | Description                                                                              | Required | Default                  |
 | -------------------- | ---------------------------------------------------------------------------------------- | -------- | ------------------------ |
 | `config-path`        | Path to the dynamic plugins config YAML file (e.g., `charts/rhdh/values.yaml`)           | Yes      | -                        |
-| `config-location`    | Location of the dynamic plugins config inside the YAML file                              | No       | `global.dynamic.plugins` |
+| `config-location`    | Location of the dynamic plugins config inside the YAML file                              | No       | `redhat-developer-hub.dynamicPlugins.plugins` |
 | `github-token`       | GitHub token for API access and PR creation                                              | Yes      | -                        |
 | `update-pr-strategy` | PR creation strategy: `separate` or `joint`                                              | No       | `separate`               |
 | `pr-creation-limit`  | Maximum number of PRs to create (0 for unlimited, only applies with `separate` strategy) | No       | `0`                      |
@@ -155,17 +155,21 @@ Specify custom tag prefixes to filter plugin versions:
 
 ## Supported Plugin Format
 
-The action works with RHDH dynamic plugins defined in the following format:
+The action reads both dynamic and intelligent assistant plugins from a parent chart's values file:
 
 ```yaml
-global:
-  dynamic:
+redhat-developer-hub:
+  dynamicPlugins:
     plugins:
       - disabled: false
         package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/backstage-plugin-name:next__1.0.0
+  intelligentAssistant:
+    plugins:
       - disabled: false
-        package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/another-plugin:next__2.0.0
+        package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/lightspeed-plugin:next__2.0.0
 ```
+
+If a new list is missing, the action falls back to its legacy location: `global.dynamic.plugins` for dynamic plugins and `global.lightspeed.plugins` for intelligent assistant plugins. The two fallbacks are independent. An empty new list takes precedence over its legacy list. Matching package tags are updated wherever they occur in the file. The `config-location` input overrides the primary dynamic plugins location.
 
 > **Note:** The legacy format with `!plugin-name` suffix (e.g., `...:next__1.0.0!backstage-plugin-name`) is also supported for backward compatibility.
 

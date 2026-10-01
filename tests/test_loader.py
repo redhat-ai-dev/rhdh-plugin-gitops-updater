@@ -10,6 +10,16 @@ from src.exceptions import InvalidRHDHPluginPackageDefinitionException
 from src.loader import RHDHPluginsConfigLoader
 
 
+def _plugin(name: "str", version: "str") -> "dict[str, str | bool]":
+    return {
+        "disabled": False,
+        "package": (
+            "oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/"
+            f"{name}:next__{version}"
+        ),
+    }
+
+
 class TestRHDHPluginsConfigLoader:
     """
     handles all tests for RHDHPluginsConfigLoader class.
@@ -18,7 +28,7 @@ class TestRHDHPluginsConfigLoader:
     def test_init_with_defaults(self) -> "None":
         loader = RHDHPluginsConfigLoader()
         assert loader.config_path == "dynamic-plugins.yaml"
-        assert loader.config_location == "global.dynamic.plugins"
+        assert loader.config_location == "redhat-developer-hub.dynamicPlugins.plugins"
 
     def test_init_with_custom_values(self) -> "None":
         loader = RHDHPluginsConfigLoader(
@@ -31,7 +41,9 @@ class TestRHDHPluginsConfigLoader:
         self, sample_config_data: "dict[str, Any]"
     ) -> "None":
         loader = RHDHPluginsConfigLoader()
-        plugins = loader._fetch_plugins_by_location(sample_config_data)
+        plugins = loader._fetch_plugins_by_location(
+            sample_config_data, "global.dynamic.plugins"
+        )
 
         assert isinstance(plugins, list)
         assert len(plugins) == 4
@@ -39,7 +51,7 @@ class TestRHDHPluginsConfigLoader:
     def test_fetch_plugins_by_location_empty_when_not_list(self) -> "None":
         loader = RHDHPluginsConfigLoader()
         data = {"global": {"dynamic": {"plugins": "not_a_list"}}}
-        plugins = loader._fetch_plugins_by_location(data)
+        plugins = loader._fetch_plugins_by_location(data, "global.dynamic.plugins")
 
         assert plugins == []
 
@@ -361,7 +373,9 @@ class TestRHDHPluginsConfigLoader:
 
     def test_init_with_default_extra_locations(self) -> "None":
         loader = RHDHPluginsConfigLoader()
-        assert loader.extra_config_locations == ["global.lightspeed.plugins"]
+        assert loader.extra_config_locations == [
+            "redhat-developer-hub.intelligentAssistant.plugins"
+        ]
 
     def test_init_with_custom_extra_locations(self) -> "None":
         loader = RHDHPluginsConfigLoader(
@@ -403,6 +417,80 @@ class TestRHDHPluginsConfigLoader:
         plugin_names = [p.plugin_name for p in plugins]
         assert "backstage-plugin-mcp-actions-backend" in plugin_names
         assert "lightspeed-plugin" in plugin_names
+
+    @pytest.mark.parametrize(
+        ("dynamic_versions", "assistant_versions", "expected"),
+        [
+            (
+                ["2.0.0"],
+                ["2.0.0"],
+                {"dynamic": Version("2.0.0"), "assistant": Version("2.0.0")},
+            ),
+            (
+                ["2.0.0"],
+                None,
+                {"dynamic": Version("2.0.0"), "assistant": Version("1.0.0")},
+            ),
+            (
+                None,
+                ["2.0.0"],
+                {"dynamic": Version("1.0.0"), "assistant": Version("2.0.0")},
+            ),
+            ([], [], {}),
+        ],
+    )
+    def test_new_locations_precede_independent_legacy_fallbacks(
+        self,
+        tmp_path: "Path",
+        dynamic_versions: "list[str] | None",
+        assistant_versions: "list[str] | None",
+        expected: "dict[str, Version]",
+    ) -> "None":
+        values = {
+            "global": {
+                "dynamic": {"plugins": [_plugin("dynamic", "1.0.0")]},
+                "lightspeed": {"plugins": [_plugin("assistant", "1.0.0")]},
+            }
+        }
+        hub = {}
+        if dynamic_versions is not None:
+            hub["dynamicPlugins"] = {
+                "plugins": [_plugin("dynamic", v) for v in dynamic_versions]
+            }
+        if assistant_versions is not None:
+            hub["intelligentAssistant"] = {
+                "plugins": [_plugin("assistant", v) for v in assistant_versions]
+            }
+        values["redhat-developer-hub"] = hub
+        config_path = tmp_path / "values.yaml"
+        config_path.write_text(yaml.safe_dump(values))
+
+        plugins = RHDHPluginsConfigLoader(config_path=config_path).load_rhdh_plugins()
+
+        assert {p.plugin_name: p.current_version for p in plugins} == expected
+        assert len(plugins) == len(expected)
+
+    def test_load_rhdh_plugins_custom_primary_location(
+        self, tmp_path: "Path"
+    ) -> "None":
+        config_path = tmp_path / "values.yaml"
+        config_path.write_text(
+            yaml.safe_dump(
+                {
+                    "custom": {"plugins": [_plugin("custom", "2.0.0")]},
+                    "global": {
+                        "dynamic": {"plugins": [_plugin("legacy", "1.0.0")]},
+                        "lightspeed": {"plugins": [_plugin("lightspeed", "1.0.0")]},
+                    },
+                }
+            )
+        )
+
+        plugins = RHDHPluginsConfigLoader(
+            config_path=config_path, config_location="custom.plugins"
+        ).load_rhdh_plugins()
+
+        assert {p.plugin_name for p in plugins} == {"custom", "lightspeed"}
 
     def test_load_rhdh_plugins_from_lightspeed_only(
         self, temp_yaml_file_lightspeed_only: "str"

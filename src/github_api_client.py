@@ -39,8 +39,8 @@ class GithubAPIClient:
         )
 
     def _fetch_next(
-        self, response: "Response", url: "str", params: "dict[str, int]"
-    ) -> "tuple[str, dict[str, int]]":
+        self, response: "Response", url: "str", params: "dict[str, str | int]"
+    ) -> "tuple[str, dict[str, str | int]]":
         """
         extracts the next URL from the response links if available
         """
@@ -62,7 +62,7 @@ class GithubAPIClient:
         ::raises:: requests.HTTPError If the API request fails
         """
         items: "list[dict[str, Any]]" = []
-        params = {
+        params: "dict[str, str | int]" = {
             "per_page": self.per_page,
         }
 

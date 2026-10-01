@@ -4,6 +4,7 @@ from unittest.mock import patch
 import pytest
 from packaging.version import Version
 
+from src.loader import RHDHPluginsConfigLoader
 from src.types import RHDHPlugin, RHDHPluginUpdate
 from src.updater import RHDHPluginConfigUpdater
 
@@ -16,7 +17,7 @@ class TestRHDHPluginConfigUpdater:
     def test_init_with_defaults(self) -> "None":
         updater = RHDHPluginConfigUpdater()
         assert updater.config_path == "dynamic-plugins.yaml"
-        assert updater.config_location == "global.dynamic.plugins"
+        assert updater.config_location == "redhat-developer-hub.dynamicPlugins.plugins"
 
     def test_init_with_custom_values(self) -> "None":
         updater = RHDHPluginConfigUpdater(
@@ -94,6 +95,42 @@ class TestRHDHPluginConfigUpdater:
         assert "software-catalog-mcp-tool:next__0.2.1" in updated_content
         # check that other plugin was not affected
         assert "mcp-actions-backend:next__0.1.2" in updated_content
+
+    @pytest.mark.parametrize(
+        ("old_section", "new_section"),
+        [
+            ("dynamic", "dynamicPlugins"),
+            ("lightspeed", "intelligentAssistant"),
+        ],
+    )
+    def test_update_matching_package_in_new_and_legacy_locations(
+        self, tmp_path: "Any", old_section: "str", new_section: "str"
+    ) -> "None":
+        package = (
+            "oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/"
+            "shared-plugin:next__1.0.0"
+        )
+        content = f"""global:
+  {old_section}:
+    plugins:
+      - package: {package}
+redhat-developer-hub:
+  {new_section}:
+    plugins:
+      - package: {package}
+"""
+        config_path = tmp_path / "values.yaml"
+        config_path.write_text(content)
+
+        plugins = RHDHPluginsConfigLoader(config_path=config_path).load_rhdh_plugins()
+        assert len(plugins) == 1
+
+        updated = RHDHPluginConfigUpdater(config_path=config_path).update_rhdh_plugin(
+            plugins[0], Version("1.0.1")
+        )
+
+        assert updated.count("shared-plugin:next__1.0.1") == 2
+        assert "shared-plugin:next__1.0.0" not in updated
 
     def test_update_rhdh_plugin(
         self, temp_yaml_file: "Any", sample_plugin: "RHDHPlugin"

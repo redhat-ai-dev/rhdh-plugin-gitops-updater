@@ -9,9 +9,9 @@ inputs:
     description: 'Path to the dynamic plugins config YAML file (e.g., charts/rhdh/values.yaml)'
     required: true
   config-location:
-    description: 'Location of the dynamic plugins config inside the YAML file (e.g., global.dynamic.plugins)'
+    description: 'Location of the dynamic plugins config inside the YAML file (e.g., redhat-developer-hub.dynamicPlugins.plugins)'
     required: false
-    default: 'global.dynamic.plugins'
+    default: 'redhat-developer-hub.dynamicPlugins.plugins'
   github-token:
     description: 'GitHub token for API access and PR creation'
     required: true
