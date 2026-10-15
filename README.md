@@ -13,7 +13,7 @@ A GitHub Action that monitors and updates RHDH plugins in your RHDH GitOps repos
 ## Features
 
 - 🔄 **Automatic Plugin Updates**: Monitors RHDH plugin versions from the GitHub Container Registry
-- 🎯 **Flexible PR Strategies**: Create `separate` PRs per plugin or a single `joint` PR for all updates
+- 🎯 **Flexible PR Strategies**: Create `separate` PRs per plugin, a single `joint` PR for all updates, or `grouped` PRs for matching frontend/backend packages
 - 🔒 **Safe Updates**: Preserves YAML formatting and validates plugin definitions
 - 🚀 **GitOps Integration**: Works seamlessly with GitOps-based RHDH deployments
 - ⚙️ **Configurable**: Customize PR limits, config paths, and update strategies
@@ -73,6 +73,23 @@ Create a single pull request containing all plugin updates:
     github-token: ${{ secrets.GITHUB_TOKEN }}
     update-pr-strategy: "joint"
 ```
+
+### Grouped PRs for Frontend and Backend Updates
+
+Changing the `update-pr-strategy` field from `separate` to `grouped` results in creating one PR for an exact frontend/backend package pair, such as `pluginabc` and `pluginabc-backend`, when both have updates in the same run and use the same tag prefix. Each package keeps its own target version; the versions can differ. Packages without a matching update get individual PRs.
+
+```yaml
+- name: Update RHDH plugins
+  uses: thepetk/rhdh-plugin-gitops-updater@v1
+  with:
+    config-path: "charts/rhdh/values.yaml"
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    update-pr-strategy: "grouped"
+```
+
+Grouping removes only a terminal `-backend` from the full OCI package name and collects updates with the same resulting name and tag channel. Namespaces are preserved; backend modules and packages in different tag channels remain separate. An existing individual update branch is skipped before grouping, so a partner that arrives later gets its own PR without duplicating the original update. Existing PRs are not refreshed; newer target versions can create new PRs, following the separate strategy.
+
+The `pr-creation-limit` counts newly created PRs per run, and a pair counts as one. Existing branches and failed creation attempts do not consume the limit. PR creation failures are logged and other groups continue, matching the separate strategy. Grouped mode completes discovery before creating PRs: a lookup exception aborts the run without creating any grouped PRs, while a package with no available versions is skipped normally.
 
 ### Custom Configuration Location
 
@@ -137,8 +154,8 @@ Specify custom tag prefixes to filter plugin versions:
 | `config-path`        | Path to the dynamic plugins config YAML file (e.g., `charts/rhdh/values.yaml`)           | Yes      | -                        |
 | `config-location`    | Location of the dynamic plugins config inside the YAML file                              | No       | `redhat-developer-hub.dynamicPlugins.plugins` |
 | `github-token`       | GitHub token for API access and PR creation                                              | Yes      | -                        |
-| `update-pr-strategy` | PR creation strategy: `separate` or `joint`                                              | No       | `separate`               |
-| `pr-creation-limit`  | Maximum number of PRs to create (0 for unlimited, only applies with `separate` strategy) | No       | `0`                      |
+| `update-pr-strategy` | PR creation strategy: `separate`, `joint`, or `grouped`                                   | No       | `separate`               |
+| `pr-creation-limit`  | Maximum new PRs per run (0 for unlimited, applies to `separate` and `grouped`; a pair counts as one PR) | No | `0` |
 | `tag-prefixes`       | Tag prefixes to consider when checking for plugin updates (newline-separated list)       | No       | `next__`                 |
 | `base-branch`        | Base branch for pull requests (overrides the branch the workflow runs on)                | No       | `main`                   |
 | `verbose`            | Enable verbose logging (0 = normal, 1 = debug)                                           | No       | `0`                      |
@@ -151,6 +168,7 @@ Specify custom tag prefixes to filter plugin versions:
 4. **PR Creation**: Creates pull requests based on your chosen strategy:
    - **Separate**: One PR per plugin update
    - **Joint**: Single PR with all updates
+   - **Grouped**: One PR per matching frontend/backend pair in the same tag channel; unmatched updates get individual PRs
 5. **Formatting Preservation**: Updates are made via string replacement to preserve your YAML formatting
 
 ## Supported Plugin Format

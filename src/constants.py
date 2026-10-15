@@ -34,10 +34,10 @@ DYNAMIC_PLUGINS_CONFIG_YAML_FALLBACK_LOCATIONS = {
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 
 # UPDATE_PR_STRATEGY: is the strategy to use when creating
-# the github pull requests. It can be either "separate" or "joint".
+# the github pull requests. It can be "separate", "joint", or "grouped".
 UPDATE_PR_STRATEGY = os.getenv("UPDATE_PR_STRATEGY", "separate")
 
-# PR_CREATION_LIMIT: is the maximum number of pull requests to create.
+# PR_CREATION_LIMIT: maximum new PRs per run for separate or grouped strategies.
 PR_CREATION_LIMIT = int(os.getenv("PR_CREATION_LIMIT", "0"))
 
 # GITHUB_REPOSITORY: is the Github repository where PRs will be

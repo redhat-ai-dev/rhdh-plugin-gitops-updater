@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 import requests
+from github import GithubException
 from github.ContentFile import ContentFile
 from packaging.version import Version
 
@@ -436,22 +437,47 @@ class TestBranchExists:
     handles all tests for _branch_exists method.
     """
 
-    def test_branch_exists_true(self, github_client: "GithubAPIClient") -> "None":
-        mock_repo = Mock()
-        mock_repo.get_git_ref.return_value = Mock()
+    @pytest.mark.parametrize(
+        ("strict", "error", "expected"),
+        [
+            (False, None, True),
+            (True, None, True),
+            (False, Exception("Branch not found"), False),
+            (True, GithubException(404, {"message": "Not Found"}), False),
+        ],
+    )
+    def test_branch_exists(
+        self,
+        github_client: "GithubAPIClient",
+        strict: "bool",
+        error: "Exception | None",
+        expected: "bool",
+    ) -> "None":
+        repo = Mock()
+        repo.get_git_ref.side_effect = error
 
-        result = github_client._branch_exists(mock_repo, "test-branch")
+        assert (
+            github_client._branch_exists(repo, "test-branch", strict=strict) is expected
+        )
+        repo.get_git_ref.assert_called_once_with("heads/test-branch")
 
-        assert result is True
-        mock_repo.get_git_ref.assert_called_once_with("heads/test-branch")
+    @pytest.mark.parametrize(
+        "error",
+        [
+            GithubException(500, {"message": "Server Error"}),
+            requests.Timeout("GitHub API timed out"),
+        ],
+    )
+    def test_strict_branch_lookup_propagates_errors(
+        self, github_client: "GithubAPIClient", error: "Exception"
+    ) -> "None":
+        repo = Mock()
+        repo.get_git_ref.side_effect = error
 
-    def test_branch_exists_false(self, github_client: "GithubAPIClient") -> "None":
-        mock_repo = Mock()
-        mock_repo.get_git_ref.side_effect = Exception("Branch not found")
+        with pytest.raises(type(error)) as exc_info:
+            github_client._branch_exists(repo, "test-branch", strict=True)
 
-        result = github_client._branch_exists(mock_repo, "test-branch")
-
-        assert result is False
+        assert exc_info.value is error
 
 
 class TestHandleNewEndline:
@@ -505,12 +531,11 @@ class TestCreatePullRequest:
     handles all tests for create_pull_request method.
     """
 
-    @patch(
-        "src.github_api_client.UPDATE_PR_STRATEGY", GithubPullRequestStrategy.SEPARATE
-    )
+    @pytest.mark.parametrize("strategy", ["separate", "grouped"])
     def test_create_pr_success_new_branch(
-        self, github_client: "GithubAPIClient"
+        self, github_client: "GithubAPIClient", monkeypatch: "Any", strategy: "str"
     ) -> "None":
+        monkeypatch.setattr("src.github_api_client.UPDATE_PR_STRATEGY", strategy)
         # Mock repository and related objects
         mock_repo = Mock()
         mock_base_ref = Mock()
@@ -544,16 +569,17 @@ class TestCreatePullRequest:
         )
 
         assert result == "https://github.com/owner/repo/pull/1"
-        mock_repo.create_git_ref.assert_called_once()
+        mock_repo.create_git_ref.assert_called_once_with(
+            "refs/heads/update-plugin", "base_sha_123"
+        )
         mock_repo.update_file.assert_called_once()
         mock_repo.create_pull.assert_called_once()
 
-    @patch(
-        "src.github_api_client.UPDATE_PR_STRATEGY", GithubPullRequestStrategy.SEPARATE
-    )
-    def test_create_pr_branch_exists_separate_strategy(
-        self, github_client: "GithubAPIClient"
+    @pytest.mark.parametrize("strategy", ["separate", "grouped"])
+    def test_create_pr_branch_exists_separate_or_grouped_strategy(
+        self, github_client: "GithubAPIClient", monkeypatch: "Any", strategy: "str"
     ) -> "None":
+        monkeypatch.setattr("src.github_api_client.UPDATE_PR_STRATEGY", strategy)
         mock_repo = Mock()
         mock_base_ref = Mock()
         mock_base_ref.object.sha = "base_sha_123"
@@ -574,6 +600,11 @@ class TestCreatePullRequest:
             )
 
         assert "already exists" in str(exc_info.value)
+
+        mock_repo.get_pulls.assert_not_called()
+        mock_repo.create_git_ref.assert_not_called()
+        mock_repo.update_file.assert_not_called()
+        mock_repo.create_pull.assert_not_called()
 
     @patch("src.github_api_client.UPDATE_PR_STRATEGY", GithubPullRequestStrategy.JOINT)
     def test_create_pr_branch_exists_with_open_pr(

@@ -8,6 +8,7 @@ from src.constants import GH_PACKAGE_TAG_PREFIXES
 class GithubPullRequestStrategy:
     SEPARATE = "separate"
     JOINT = "joint"
+    GROUPED = "grouped"
 
 
 @dataclass
@@ -67,6 +68,11 @@ class RHDHPluginUpdaterConfig:
     GH_PR_TITLE_BASE = (
         "chore(`rhdh-plugin-gitops-updater`) Update `{plugin_name}` "
         "to version `{latest_version}`"
+    )
+    GH_GROUPED_PR_BRANCH_NAME_BASE = "update-grouped-{plugin_name}-{update_hash}"
+    GH_GROUPED_PR_TITLE_BASE = (
+        "chore(`rhdh-plugin-gitops-updater`) Update `{plugin_name}` "
+        "({plugin_updates_count} packages)"
     )
     GH_PR_BODY_BASE = """## Plugin Update
 

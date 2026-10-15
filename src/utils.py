@@ -4,7 +4,7 @@ from typing import Any
 from packaging.version import Version
 
 from src.constants import logger
-from src.types import RHDHPluginUpdaterConfig
+from src.types import RHDHPluginUpdate, RHDHPluginUpdaterConfig
 
 
 def get_plugins_list_from_dict(
@@ -111,3 +111,18 @@ def match_tag_prefix(tag: "str") -> "str | None":
         if tag.startswith(prefix):
             return prefix
     return None
+
+
+def group_plugin_updates(
+    updates: "list[RHDHPluginUpdate]",
+) -> "list[list[RHDHPluginUpdate]]":
+    """Group by full package name without a terminal -backend, and tag channel."""
+    groups: dict[tuple[str, str | None], list[RHDHPluginUpdate]] = {}
+    for update in updates:
+        plugin = update.rhdh_plugin
+        key = (
+            plugin.package_name.removesuffix("-backend"),
+            plugin.current_tag_prefix,
+        )
+        groups.setdefault(key, []).append(update)
+    return list(groups.values())

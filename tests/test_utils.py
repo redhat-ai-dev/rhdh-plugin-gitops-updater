@@ -3,10 +3,12 @@ from typing import Any
 import pytest
 from packaging.version import Version
 
+from src.types import RHDHPlugin, RHDHPluginUpdate
 from src.utils import (
     build_version_string,
     compare_versions,
     get_plugins_list_from_dict,
+    group_plugin_updates,
     parse_dual_version,
     rhdh_plugin_needs_update,
 )
@@ -308,3 +310,82 @@ class TestBuildVersionString:
     def test_none_second_version(self) -> "None":
         result = build_version_string(Version("1.0.0"), None)
         assert result == "1.0.0"
+
+
+class TestGroupPluginUpdates:
+    """Groups updates by package family and tag channel."""
+
+    @staticmethod
+    def update(
+        package_name: str,
+        *,
+        plugin_name: str | None = None,
+        prefix: str = "next__",
+        version: str = "1.0.0",
+    ) -> RHDHPluginUpdate:
+        return RHDHPluginUpdate(
+            rhdh_plugin=RHDHPlugin(
+                package_name=package_name,
+                current_version=Version("0.1.0"),
+                plugin_name=plugin_name or package_name.rsplit("/", 1)[-1],
+                disabled=False,
+                current_tag_prefix=prefix,
+            ),
+            new_version=Version(version),
+        )
+
+    def test_keeps_backend_only_and_non_exact_namespaces_or_suffixes_separate(
+        self,
+    ) -> "None":
+        updates = [
+            self.update("scope/orphan-backend"),
+            self.update("scope/plugin"),
+            self.update("other/plugin-backend"),
+            self.update("scope/plugin-backend-module"),
+            self.update("scope/plugin-extra"),
+            self.update("scope/plugin-backend-extra"),
+        ]
+
+        groups = group_plugin_updates(updates)
+
+        assert groups == [[update] for update in updates]
+
+    def test_groups_exact_families_and_channels_in_first_seen_order(self) -> "None":
+        assistant = self.update(
+            "scope/intelligent-assistant",
+            plugin_name="frontend-alias",
+            prefix="bs_",
+            version="2.0.0",
+        )
+        assistant_backend = self.update(
+            "scope/intelligent-assistant-backend",
+            plugin_name="backend-alias",
+            prefix="bs_",
+            version="3.0.0",
+        )
+        orchestrator = self.update("scope/orchestrator", prefix="next__")
+        orchestrator_backend = self.update("scope/orchestrator-backend", prefix="bs_")
+        topology = self.update("scope/topology", prefix="bs_")
+
+        groups = group_plugin_updates(
+            [assistant, orchestrator, topology, assistant_backend, orchestrator_backend]
+        )
+
+        assert groups == [
+            [assistant, assistant_backend],
+            [orchestrator],
+            [topology],
+            [orchestrator_backend],
+        ]
+
+    def test_groups_in_reverse_input_order_and_preserves_duplicate_records(
+        self,
+    ) -> "None":
+        frontend = self.update("scope/plugin")
+        backend = self.update("scope/plugin-backend")
+        updates = [backend, frontend, backend, frontend]
+
+        groups = group_plugin_updates(updates)
+
+        assert groups == [[backend, frontend, backend, frontend]]
+        assert [update for group in groups for update in group] == updates

@@ -2,7 +2,7 @@ from typing import Any
 from urllib.parse import quote
 
 import requests
-from github import Auth, Github
+from github import Auth, Github, GithubException
 from github.ContentFile import ContentFile
 from github.Repository import Repository
 from requests import Response
@@ -163,7 +163,9 @@ class GithubAPIClient:
             package_name, raw_versions, tag_prefix_filter
         )
 
-    def _branch_exists(self, repo: "Repository", branch_name: "str") -> "bool":
+    def _branch_exists(
+        self, repo: "Repository", branch_name: "str", *, strict: "bool" = False
+    ) -> "bool":
         """
         checks if a branch exists in the given repository
         """
@@ -171,7 +173,11 @@ class GithubAPIClient:
             repo.get_git_ref(f"heads/{branch_name}")
             logger.debug(f"branch {branch_name} already exists")
             return True
-        except Exception:
+        except Exception as error:
+            if strict and (
+                not isinstance(error, GithubException) or error.status != 404
+            ):
+                raise
             logger.debug(f"branch {branch_name} does not exist, will create it")
             return False
 
@@ -209,8 +215,11 @@ class GithubAPIClient:
         base_sha = base_ref.object.sha
 
         if self._branch_exists(repo, branch_name):
-            # skip for separate pr strategy
-            if UPDATE_PR_STRATEGY == GithubPullRequestStrategy.SEPARATE:
+            # skip for separate and grouped PR strategies
+            if UPDATE_PR_STRATEGY in (
+                GithubPullRequestStrategy.SEPARATE,
+                GithubPullRequestStrategy.GROUPED,
+            ):
                 logger.debug(f"checking for existing open PR for branch {branch_name}")
                 raise GithubPRFailedException(f"Branch {branch_name} already exists")
 

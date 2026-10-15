@@ -16,11 +16,11 @@ inputs:
     description: 'GitHub token for API access and PR creation'
     required: true
   update-pr-strategy:
-    description: 'PR creation strategy: "separate" for individual PRs per plugin, "joint" for one PR with all updates'
+    description: 'PR creation strategy: "separate" per plugin, "joint" for all updates, "grouped" for matching frontend/backend packages in the same tag channel'
     required: false
     default: 'separate'
   pr-creation-limit:
-    description: 'Maximum number of PRs to create (0 for unlimited, only applies when update-pr-strategy is "separate")'
+    description: 'Maximum new PRs per run (0 for unlimited, applies to "separate" and "grouped"; a grouped pair counts as one PR)'
     required: false
     default: '0'
   verbose:
